@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 
 from .models import AttributedTask, Task
 
@@ -20,6 +20,11 @@ def _clip_interval(
       'start'  — entire interval attributed to start day; counts only if start day in period
       'end'    — entire interval attributed to end day; counts only if end day in period
     """
+    if midnight_split not in ("split", "start", "end"):
+        raise ValueError(
+            f"midnight_split must be 'split', 'start', or 'end'; got {midnight_split!r}"
+        )
+
     total = int((end - start).total_seconds())
     if total <= 0:
         return 0
@@ -30,9 +35,9 @@ def _clip_interval(
     if midnight_split == "end":
         return total if period_start <= end.date() <= period_end else 0
 
-    # Default: "split" — clip interval to [period_start 00:00, period_end 23:59:59.999999]
-    window_start = datetime.combine(period_start, time.min)
-    window_end = datetime.combine(period_end, time.max)
+    # Default: "split" — clip interval to [period_start 00:00, period_end+1 00:00)
+    window_start = datetime.combine(period_start, datetime.min.time())
+    window_end = datetime.combine(period_end + timedelta(days=1), datetime.min.time())
     clipped_start = max(start, window_start)
     clipped_end = min(end, window_end)
     if clipped_start >= clipped_end:

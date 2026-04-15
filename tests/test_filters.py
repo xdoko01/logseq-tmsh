@@ -139,3 +139,14 @@ def test_filter_include_zero():
     attributed = attribute_tasks(tasks, date(2026, 4, 15), date(2026, 4, 15))
     result = filter_tasks(attributed, include_zero=True)
     assert len(result) == 1
+
+
+def test_filter_combined_tag_and_ref():
+    tasks = _load("tags_refs.md", date(2026, 4, 15))
+    attributed = attribute_tasks(tasks, date(2026, 4, 15), date(2026, 4, 15))
+    # Task has both #ori tag and [[OrisalesRetirement]] ref → match
+    result = filter_tasks(attributed, tags=["ori"], refs=["OrisalesRetirement"])
+    assert len(result) == 1
+    # Task does NOT have [[Nobody]] ref → no match
+    result = filter_tasks(attributed, tags=["ori"], refs=["Nobody"])
+    assert len(result) == 0
