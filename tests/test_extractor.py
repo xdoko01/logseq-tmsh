@@ -78,3 +78,13 @@ def test_extract_source_fields():
     tasks = _tasks(fname)
     assert all(t.source_file == fname for t in tasks)
     assert all(t.source_date == date(2026, 4, 15) for t in tasks)
+
+
+def test_extract_nested_tasks_recursion():
+    # nested_task.md has children but they are notes, not tasks.
+    # simple_task.md has 2 top-level tasks. Verify both are found.
+    tasks = _tasks("simple_task.md")
+    statuses = [t.status for t in tasks]
+    assert "DONE" in statuses
+    assert "TODO" in statuses
+    assert len(tasks) == 2

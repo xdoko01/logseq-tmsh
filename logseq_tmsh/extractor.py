@@ -42,7 +42,7 @@ def _parse_logseq_date(value: str, prop_name: str, source_file: str) -> date | N
         return date(year, month, day)
     except (KeyError, ValueError) as exc:
         print(
-            f"WARNING: {source_file}: invalid date in '{prop_name}': {exc}",
+            f"WARNING: {source_file}: unparseable date in '{prop_name}': {exc}",
             file=sys.stderr,
         )
         return None
@@ -67,7 +67,15 @@ def extract_tasks(
 ) -> list[Task]:
     """Walk a list of Blocks (and their children recursively) and return all Task objects."""
     tasks: list[Task] = []
-    _walk(blocks, source_file, source_date, time_spent_property, completed_property, started_property, tasks)
+    _walk(
+        blocks,
+        source_file,
+        source_date,
+        time_spent_property,
+        completed_property,
+        started_property,
+        tasks,
+    )
     return tasks
 
 
