@@ -10,12 +10,13 @@ from .models import Block, ClockEntry
 # ── Timestamp patterns ────────────────────────────────────────────────────────
 _TS = r"\d{4}-\d{2}-\d{2} \w{3} \d{2}:\d{2}:\d{2}"
 _CLOCK_COMPLETED_RE = re.compile(
-    r"CLOCK: \[(" + _TS + r")\]--\[(" + _TS + r")\]"
+    r"^CLOCK: \[(" + _TS + r")\]--\[(" + _TS + r")\]"
 )
-_CLOCK_RUNNING_RE = re.compile(r"CLOCK: \[(" + _TS + r")\]\s*$")
+_CLOCK_RUNNING_RE = re.compile(r"^CLOCK: \[(" + _TS + r")\]\s*$")
 _TS_FMT = "%Y-%m-%d %a %H:%M:%S"
 
 # ── Property pattern ──────────────────────────────────────────────────────────
+# Used by _parse_lines (added in Task 4) — defined here to co-locate all line-level patterns.
 _PROPERTY_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*):: (.*)$")
 
 
