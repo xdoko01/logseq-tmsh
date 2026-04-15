@@ -63,3 +63,83 @@ def parse_clock_line(line: str, source_file: str, lineno: int) -> ClockEntry | N
         file=sys.stderr,
     )
     return None
+
+
+def parse_file(path: Path) -> list[Block]:
+    """Parse a LogSeq journal .md file into a flat list of top-level Blocks.
+
+    LogSeq indentation convention:
+      - Bullet lines:        N tabs + '- ' + content
+      - Continuation lines:  N tabs + '  ' + content  (properties, LOGBOOK)
+      - Child bullet lines:  (N+1) tabs + '- ' + content
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return _parse_lines(lines, path.name)
+
+
+def _parse_lines(lines: list[str], source_name: str) -> list[Block]:
+    """Build a list of top-level Blocks from raw markdown lines."""
+    root_blocks: list[Block] = []
+    # Stack of (indent_level, Block) — top is the most recently opened block
+    stack: list[tuple[int, Block]] = []
+    in_logbook = False
+
+    for lineno, raw in enumerate(lines, 1):
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        # Skip section headers (## ...) — they are structural markers, not blocks
+        if stripped.startswith("#"):
+            continue
+
+        tab_count = len(raw) - len(raw.lstrip("\t"))
+        rest = raw[tab_count:]  # content after leading tabs
+
+        if rest.startswith("- "):
+            # ── New block ────────────────────────────────────────────────────
+            in_logbook = False
+            content = rest[2:]  # strip leading '- '
+
+            # Skip section-header bullets (e.g. '- ## New Tasks') — structural
+            # markers only; their children are promoted to the enclosing scope.
+            if content.startswith("#"):
+                # Pop the stack as if this indent level were closed, so the
+                # header's children will be added to the correct parent or root.
+                while stack and stack[-1][0] >= tab_count:
+                    stack.pop()
+                continue
+
+            block = Block(indent_level=tab_count, content=content)
+
+            # Pop blocks at same or deeper indent (they are now closed)
+            while stack and stack[-1][0] >= tab_count:
+                stack.pop()
+
+            if stack:
+                stack[-1][1].children.append(block)
+            else:
+                root_blocks.append(block)
+
+            stack.append((tab_count, block))
+
+        elif stack:
+            # ── Continuation line ─────────────────────────────────────────────
+            # Belongs to the most recently opened block (top of stack).
+            current = stack[-1][1]
+
+            if stripped == ":LOGBOOK:":
+                in_logbook = True
+            elif stripped == ":END:":
+                in_logbook = False
+            elif in_logbook and stripped.startswith("CLOCK:"):
+                entry = parse_clock_line(stripped, source_name, lineno)
+                if entry is not None:
+                    current.logbook.append(entry)
+            elif in_logbook:
+                pass  # other LOGBOOK lines (e.g. blank or future formats) — ignore
+            else:
+                m = _PROPERTY_RE.match(stripped)
+                if m:
+                    current.properties[m.group(1)] = m.group(2)
+
+    return root_blocks
