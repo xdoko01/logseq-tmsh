@@ -1,5 +1,10 @@
 from datetime import datetime
-from logseq_tmsh.parser import parse_clock_line
+from pathlib import Path
+
+from logseq_tmsh.models import TASK_STATUSES
+from logseq_tmsh.parser import parse_file, parse_clock_line
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_parse_completed_clock():
@@ -45,15 +50,9 @@ def test_parse_clock_midnight_crossing():
     assert entry.end.date().isoformat() == "2026-04-15"
 
 
-from pathlib import Path
-from logseq_tmsh.parser import parse_file
-
-FIXTURES = Path(__file__).parent / "fixtures"
-
-
 def test_parse_file_task_count():
     blocks = parse_file(FIXTURES / "simple_task.md")
-    tasks = [b for b in blocks if b.content.split()[0] in ("DONE", "TODO", "DOING", "LATER", "WAITING", "CANCELLED", "NOW")]
+    tasks = [b for b in blocks if b.content.split()[0] in TASK_STATUSES]
     assert len(tasks) == 2
 
 

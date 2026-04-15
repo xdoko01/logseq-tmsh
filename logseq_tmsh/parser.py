@@ -17,6 +17,8 @@ _TS_FMT = "%Y-%m-%d %a %H:%M:%S"
 
 # ── Property pattern ──────────────────────────────────────────────────────────
 # Used by _parse_lines (added in Task 4) — defined here to co-locate all line-level patterns.
+# Note: requires a space after '::' (e.g. 'key:: value'). LogSeq always emits this space,
+# but manually edited files omitting the space will silently skip the property.
 _PROPERTY_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*):: (.*)$")
 
 
