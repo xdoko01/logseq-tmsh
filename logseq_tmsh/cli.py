@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
@@ -201,3 +202,98 @@ def range_cmd(
         tag, ref, status, include_zero, pretty, indent, fields,
         strip_tags, strip_refs, config,
     )
+
+
+@app.command()
+def configure() -> None:
+    """Interactive setup wizard — creates or updates ~/.logseq-tmsh/config.toml."""
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    config_dir = Path.home() / ".logseq-tmsh"
+    config_path = config_dir / "config.toml"
+    config_dir.mkdir(exist_ok=True)
+
+    # Load existing values as defaults for prompts
+    existing: dict = {}
+    if config_path.exists():
+        with open(config_path, "rb") as f:
+            existing = tomllib.load(f)
+
+    def _get(section: str, key: str, fallback):
+        return existing.get(section, {}).get(key, fallback)
+
+    typer.echo("logseq-tmsh configuration wizard")
+    typer.echo("Press Enter to keep the current value shown in [brackets].\n")
+
+    journals = typer.prompt(
+        "Journal directory path",
+        default=_get("paths", "journals", ""),
+    )
+    extra_dirs_raw = typer.prompt(
+        "Extra directories to scan (comma-separated, leave empty for none)",
+        default=",".join(_get("paths", "extra_dirs", [])),
+    )
+    extra_dirs = [d.strip() for d in extra_dirs_raw.split(",") if d.strip()]
+
+    midnight_split = typer.prompt(
+        "Midnight-crossing CLOCK strategy [split/start/end]",
+        default=_get("parsing", "midnight_split", "split"),
+    )
+    time_spent_property = typer.prompt(
+        "Property name for time override (minutes)",
+        default=_get("parsing", "time_spent_property", "time_spent"),
+    )
+    completed_property = typer.prompt(
+        "Property name for completion date",
+        default=_get("parsing", "completed_property", "completed"),
+    )
+    started_property = typer.prompt(
+        "Property name for start date",
+        default=_get("parsing", "started_property", "started"),
+    )
+    date_format = typer.prompt(
+        "Date output format (strftime)",
+        default=_get("output", "date_format", "%Y-%m-%d"),
+    )
+    default_fields_raw = typer.prompt(
+        "Default output fields (comma-separated)",
+        default=",".join(
+            _get("output", "default_fields", ["title", "status", "time_period", "started", "completed", "tags"])
+        ),
+    )
+    default_fields = [f.strip() for f in default_fields_raw.split(",") if f.strip()]
+    include_zero = typer.confirm(
+        "Include tasks with 0 time logged by default?",
+        default=_get("output", "include_zero", False),
+    )
+
+    # Write config using manual TOML serialisation (no toml-write dependency)
+    def _toml_str(v: str) -> str:
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+    def _toml_list(lst: list[str]) -> str:
+        return "[" + ", ".join(_toml_str(x) for x in lst) + "]"
+
+    toml_content = f"""\
+[paths]
+journals = {_toml_str(journals)}
+extra_dirs = {_toml_list(extra_dirs)}
+
+[parsing]
+midnight_split = {_toml_str(midnight_split)}
+time_spent_property = {_toml_str(time_spent_property)}
+completed_property = {_toml_str(completed_property)}
+started_property = {_toml_str(started_property)}
+
+[output]
+date_format = {_toml_str(date_format)}
+datetime_format = "%Y-%m-%d %H:%M"
+default_fields = {_toml_list(default_fields)}
+include_zero = {"true" if include_zero else "false"}
+"""
+
+    config_path.write_text(toml_content, encoding="utf-8")
+    typer.echo(f"\nConfiguration saved to {config_path}")
