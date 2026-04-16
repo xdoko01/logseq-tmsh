@@ -219,8 +219,14 @@ def configure() -> None:
     # Load existing values as defaults for prompts
     existing: dict = {}
     if config_path.exists():
-        with open(config_path, "rb") as f:
-            existing = tomllib.load(f)
+        try:
+            with open(config_path, "rb") as f:
+                existing = tomllib.load(f)
+        except Exception as exc:
+            typer.echo(
+                f"Warning: existing config could not be parsed ({exc}). Starting from defaults.",
+                err=True,
+            )
 
     def _get(section: str, key: str, fallback):
         return existing.get(section, {}).get(key, fallback)
@@ -258,6 +264,10 @@ def configure() -> None:
         "Date output format (strftime)",
         default=_get("output", "date_format", "%Y-%m-%d"),
     )
+    datetime_format = typer.prompt(
+        "Datetime output format (strftime)",
+        default=_get("output", "datetime_format", "%Y-%m-%d %H:%M"),
+    )
     default_fields_raw = typer.prompt(
         "Default output fields (comma-separated)",
         default=",".join(
@@ -290,7 +300,7 @@ started_property = {_toml_str(started_property)}
 
 [output]
 date_format = {_toml_str(date_format)}
-datetime_format = "%Y-%m-%d %H:%M"
+datetime_format = {_toml_str(datetime_format)}
 default_fields = {_toml_list(default_fields)}
 include_zero = {"true" if include_zero else "false"}
 """
