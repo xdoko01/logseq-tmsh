@@ -5,6 +5,21 @@ description = "Extract time-tracking data from LogSeq journal CLOCK entries"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
+authors = [
+    {name = "Otakar Dokoupil", email = "Otakar.Dokoupil@oriflame.com"},
+]
+keywords = ["logseq", "time-tracking", "cli", "productivity"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
 dependencies = [
     "typer>=0.12.0",
     "tomli>=2.0.1; python_version < '3.11'",

@@ -2,6 +2,8 @@
 
 Extract time-tracking data from [LogSeq](https://logseq.com/) journal CLOCK entries.
 
+logseq-tmsh reads your LogSeq graph's daily journal files and sums up time from org-mode `CLOCK:` blocks, letting you query what you worked on today, this week, or any date range.
+
 ## Install
 
 ```bash
@@ -22,8 +24,8 @@ ltmsh today
 # Show this week
 ltmsh week
 
-# Show a custom range
-ltmsh range --from 2026-04-01 --to 2026-04-15
+# Show a custom range (dates in YYYY-MM-DD format)
+ltmsh range --from 2024-01-01 --to 2024-01-31
 
 # Human-readable output
 ltmsh today --pretty
