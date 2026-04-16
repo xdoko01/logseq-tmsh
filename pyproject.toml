@@ -31,8 +31,8 @@ dependencies = [
 ltmsh = "logseq_tmsh.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/odokoupil/logseq-tmsh"
-Repository = "https://github.com/odokoupil/logseq-tmsh"
+Homepage = "https://github.com/xdoko01/logseq-tmsh"
+Repository = "https://github.com/xdoko01/logseq-tmsh"
 
 [build-system]
 requires = ["hatchling"]
