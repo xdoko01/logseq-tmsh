@@ -23,7 +23,10 @@ def test_attribution_full_clock_in_period():
 def test_attribution_clock_outside_period():
     tasks = _load("simple_task.md", date(2026, 4, 15))
     attributed = attribute_tasks(tasks, date(2026, 4, 16), date(2026, 4, 16))
-    assert all(a.period_seconds == 0 for a in attributed)
+    # DONE task's CLOCK is entirely on Apr 15; querying Apr 16 → 0 seconds.
+    # (The TODO task has a running CLOCK so its period_seconds depend on `now`.)
+    done = next(a for a in attributed if a.task.status == "DONE")
+    assert done.period_seconds == 0
 
 
 def test_attribution_midnight_split_default():

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
@@ -11,14 +10,10 @@ from .config import load_config
 from .extractor import extract_tasks
 from .filters import attribute_tasks, filter_tasks
 from .formatters import format_json, format_pretty
+from .models import Task
 from .parser import parse_file
 
-app = typer.Typer(help="LogSeq time-tracking CLI.")
-
-
-@app.callback(invoke_without_command=True)
-def main() -> None:
-    """LogSeq time-tracking CLI."""
+app = typer.Typer(help="Extract time-tracking data from LogSeq journal CLOCK entries.")
 
 
 # ── Shared option definitions ──────────────────────────────────────────────────
@@ -68,7 +63,8 @@ def _run_query(
     output_fields = [f.strip() for f in fields.split(",")] if fields else cfg.default_fields
 
     # Collect .md files within the date range
-    all_tasks = []
+    all_tasks: list[Task] = []
+    buffer = timedelta(days=1)
     for scan_dir in scan_dirs:
         if not scan_dir.exists():
             typer.echo(f"ERROR: Journal path not found: {scan_dir}", err=True)
@@ -87,7 +83,6 @@ def _run_query(
 
             # Only parse files that could contain relevant CLOCKs.
             # Use a 1-day buffer on each side to capture midnight-crossing CLOCKs.
-            buffer = timedelta(days=1)
             if file_date < period_start - buffer or file_date > period_end + buffer:
                 continue
 
