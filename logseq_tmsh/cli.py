@@ -63,9 +63,12 @@ def _run_query(
     # Resolve output fields
     output_fields = [f.strip() for f in fields.split(",")] if fields else cfg.default_fields
 
-    # Collect .md files within the date range
+    # Collect .md files within the date range.
+    # Use a 2-day buffer so CLOCKs that start up to 2 days before the period
+    # start (e.g. forgotten to clock out Friday, stopped Monday morning) are
+    # still captured by the midnight-split logic.
     all_tasks: list[Task] = []
-    buffer = timedelta(days=1)
+    buffer = timedelta(days=2)
     for scan_dir in scan_dirs:
         if not scan_dir.exists():
             typer.echo(f"ERROR: Journal path not found: {scan_dir}", err=True)
@@ -90,6 +93,8 @@ def _run_query(
             try:
                 blocks = parse_file(md_file)
             except OSError as exc:
+                # Exit 3 = journal file I/O error; malformed CLOCK lines are
+                # handled gracefully as warnings inside parse_file(), not here.
                 typer.echo(f"ERROR: Cannot read {md_file}: {exc}", err=True)
                 raise typer.Exit(3)
 
@@ -282,7 +287,15 @@ def configure() -> None:
 
     # Write config using manual TOML serialisation (no toml-write dependency)
     def _toml_str(v: str) -> str:
-        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        return (
+            '"'
+            + v.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+            + '"'
+        )
 
     def _toml_list(lst: list[str]) -> str:
         return "[" + ", ".join(_toml_str(x) for x in lst) + "]"

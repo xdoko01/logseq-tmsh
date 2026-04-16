@@ -38,7 +38,7 @@ class Config:
     completed_property: str
     started_property: str
     date_format: str
-    datetime_format: str
+    datetime_format: str  # reserved — not yet used by formatters
     default_fields: list[str]
     include_zero: bool
 
@@ -81,8 +81,12 @@ def load_config(extra_path: Path | None = None) -> Config:
     """
     merged = dict(_DEFAULTS)
     for path in _find_config_files(extra_path):
-        with open(path, "rb") as f:
-            user_cfg = tomllib.load(f)
+        try:
+            with open(path, "rb") as f:
+                user_cfg = tomllib.load(f)
+        except Exception as exc:
+            print(f"WARNING: Could not parse config file {path}: {exc}", file=sys.stderr)
+            continue
         merged = _deep_merge(merged, user_cfg)
 
     p = merged["paths"]
