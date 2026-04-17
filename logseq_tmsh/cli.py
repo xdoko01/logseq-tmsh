@@ -7,6 +7,7 @@ from typing import Optional
 
 import typer
 
+from . import __version__
 from .config import load_config
 from .extractor import extract_tasks
 from .filters import attribute_tasks, filter_tasks
@@ -15,6 +16,22 @@ from .models import Task
 from .parser import parse_file
 
 app = typer.Typer(help="Extract time-tracking data from LogSeq journal CLOCK entries.")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"ltmsh {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", "-V", callback=_version_callback, is_eager=True,
+        help="Show version and exit.",
+    ),
+) -> None:
+    pass
 
 
 # ── Shared option definitions ──────────────────────────────────────────────────

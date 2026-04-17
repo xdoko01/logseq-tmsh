@@ -15,6 +15,9 @@ uv tool install logseq-tmsh
 ## Quick Start
 
 ```bash
+# Show version
+ltmsh --version
+
 # Configure once
 ltmsh configure
 
