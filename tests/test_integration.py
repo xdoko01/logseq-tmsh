@@ -51,8 +51,8 @@ def test_range_apr15_task_count(tmp_path):
     ])
     assert result.exit_code == 0, (result.output or repr(result.exception))
     data = json.loads(result.output)
-    # 3 tasks on Apr 15 all have time > 0
-    assert len(data) == 3
+    # 3 tasks from 2026_04_15.md + 1 old task (2024_01_10.md) with a CLOCK on Apr 15
+    assert len(data) == 4
 
 
 def test_range_two_day_window(tmp_path):
@@ -63,8 +63,8 @@ def test_range_two_day_window(tmp_path):
     ])
     assert result.exit_code == 0, (result.output or repr(result.exception))
     data = json.loads(result.output)
-    # 2 tasks on Apr 14 + 3 on Apr 15 = 5 total
-    assert len(data) == 5
+    # 2 tasks on Apr 14 + 3 on Apr 15 + 1 old task (2024_01_10.md) with a CLOCK on Apr 15
+    assert len(data) == 6
 
 
 def test_range_tag_filter(tmp_path):
@@ -149,3 +149,37 @@ def test_empty_result_set_returns_exit_zero(tmp_path):
     assert result.exit_code == 0, (result.output or repr(result.exception))
     data = json.loads(result.output)
     assert data == []
+
+
+def test_old_file_clock_found_by_default(tmp_path):
+    # 2024_01_10.md has a CLOCK on 2026-04-15 for a task created in 2024.
+    # Without a scan_from limit, querying 2026-04-15 must find that CLOCK.
+    result = runner.invoke(app, [
+        "range", "--from", "2026-04-15", "--to", "2026-04-15",
+        "--config", _cfg(tmp_path),
+        "--fields", "title,status,time_period",
+    ])
+    assert result.exit_code == 0, (result.output or repr(result.exception))
+    data = json.loads(result.output)
+    titles = [item["title"] for item in data]
+    assert any("Very old task" in t for t in titles), (
+        "Expected old task with recent CLOCK to appear in results; got: " + str(titles)
+    )
+
+
+def test_scan_from_excludes_old_file(tmp_path):
+    # With --scan-from 2026-01-01, the 2024_01_10.md fixture is skipped entirely.
+    result = runner.invoke(app, [
+        "range", "--from", "2026-04-15", "--to", "2026-04-15",
+        "--config", _cfg(tmp_path),
+        "--scan-from", "2026-01-01",
+        "--fields", "title,status,time_period",
+    ])
+    assert result.exit_code == 0, (result.output or repr(result.exception))
+    data = json.loads(result.output)
+    titles = [item["title"] for item in data]
+    assert not any("Very old task" in t for t in titles), (
+        "Old file should have been skipped by --scan-from; got: " + str(titles)
+    )
+    # The three regular Apr 15 tasks must still be present
+    assert len(data) == 3

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 if sys.version_info >= (3, 11):
@@ -13,6 +14,7 @@ _DEFAULTS: dict = {
     "paths": {
         "journals": "",
         "extra_dirs": [],
+        "scan_from": None,
     },
     "parsing": {
         "midnight_split": "split",
@@ -33,6 +35,7 @@ _DEFAULTS: dict = {
 class Config:
     journals: str
     extra_dirs: list[str]
+    scan_from: date | None  # optional lower bound on file scanning (YYYY-MM-DD in config)
     midnight_split: str
     time_spent_property: str
     completed_property: str
@@ -93,9 +96,17 @@ def load_config(extra_path: Path | None = None) -> Config:
     pa = merged["parsing"]
     o = merged["output"]
 
+    scan_from: date | None = None
+    if p.get("scan_from"):
+        try:
+            scan_from = date.fromisoformat(p["scan_from"])
+        except (ValueError, TypeError) as exc:
+            print(f"WARNING: Invalid scan_from in config ({p['scan_from']!r}): {exc}", file=sys.stderr)
+
     return Config(
         journals=p["journals"],
         extra_dirs=p["extra_dirs"],
+        scan_from=scan_from,
         midnight_split=pa["midnight_split"],
         time_spent_property=pa["time_spent_property"],
         completed_property=pa["completed_property"],

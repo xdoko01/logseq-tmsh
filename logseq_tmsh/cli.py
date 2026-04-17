@@ -28,6 +28,11 @@ _FIELDS_OPT = typer.Option(None, "--fields", help="Comma-separated field list, o
 _STRIP_TAGS_OPT = typer.Option(False, "--strip-tags", help="Remove #tags from title")
 _STRIP_REFS_OPT = typer.Option(False, "--strip-refs", help="Convert [[Ref]] to plain Ref in title")
 _CONFIG_OPT = typer.Option(None, "--config", help="Path to an additional config TOML file")
+_SCAN_FROM_OPT = typer.Option(
+    None, "--scan-from",
+    help="Ignore journal files dated before this date (YYYY-MM-DD). "
+         "Default: scan all files. Use to speed up queries when old tasks are irrelevant.",
+)
 
 
 def _run_query(
@@ -43,6 +48,7 @@ def _run_query(
     strip_tags: bool,
     strip_refs: bool,
     config_path: Path | None,
+    scan_from: str | None,
 ) -> None:
     cfg = load_config(config_path)
 
@@ -63,10 +69,30 @@ def _run_query(
     # Resolve output fields
     output_fields = [f.strip() for f in fields.split(",")] if fields else cfg.default_fields
 
-    # Collect .md files within the date range.
-    # Use a 2-day buffer so CLOCKs that start up to 2 days before the period
-    # start (e.g. forgotten to clock out Friday, stopped Monday morning) are
-    # still captured by the midnight-split logic.
+    # Resolve the effective scan_from lower bound.
+    # CLI flag takes precedence over config; both are optional.
+    effective_scan_from: date | None = cfg.scan_from
+    if scan_from is not None:
+        try:
+            effective_scan_from = date.fromisoformat(scan_from)
+        except ValueError:
+            typer.echo(f"ERROR: --scan-from must be YYYY-MM-DD, got: {scan_from!r}", err=True)
+            raise typer.Exit(1)
+
+    # Collect .md files to parse.
+    #
+    # By default we scan ALL journal files regardless of their date, because a
+    # task created long ago can have CLOCK entries added recently (the CLOCK
+    # lives in the same file as the task block, not in today's journal).
+    #
+    # We keep an upper-bound skip: files dated after period_end + buffer cannot
+    # contain CLOCKs relevant to the query period.
+    #
+    # A 2-day buffer handles CLOCKs that straddle midnight (e.g. forgotten to
+    # clock out Friday, stopped Monday morning).
+    #
+    # Users who know their tasks are recent can pass --scan-from to skip old
+    # files and speed up large vaults.
     all_tasks: list[Task] = []
     buffer = timedelta(days=2)
     for scan_dir in scan_dirs:
@@ -85,9 +111,11 @@ def _run_query(
             except (ValueError, IndexError):
                 continue  # skip non-journal files
 
-            # Only parse files that could contain relevant CLOCKs.
-            # Use a 1-day buffer on each side to capture midnight-crossing CLOCKs.
-            if file_date < period_start - buffer or file_date > period_end + buffer:
+            # Skip files created after the query period (can't have relevant CLOCKs).
+            if file_date > period_end + buffer:
+                continue
+            # Honour the optional scan_from lower bound.
+            if effective_scan_from is not None and file_date < effective_scan_from:
                 continue
 
             try:
@@ -139,13 +167,14 @@ def today(
     strip_tags: bool = _STRIP_TAGS_OPT,
     strip_refs: bool = _STRIP_REFS_OPT,
     config: Optional[Path] = _CONFIG_OPT,
+    scan_from: Optional[str] = _SCAN_FROM_OPT,
 ) -> None:
     """Show tasks worked on today."""
     today_date = date.today()
     _run_query(
         today_date, today_date,
         tag, ref, status, include_zero, pretty, indent, fields,
-        strip_tags, strip_refs, config,
+        strip_tags, strip_refs, config, scan_from,
     )
 
 
@@ -161,6 +190,7 @@ def week(
     strip_tags: bool = _STRIP_TAGS_OPT,
     strip_refs: bool = _STRIP_REFS_OPT,
     config: Optional[Path] = _CONFIG_OPT,
+    scan_from: Optional[str] = _SCAN_FROM_OPT,
 ) -> None:
     """Show tasks worked on during the current week (Monday to today)."""
     today_date = date.today()
@@ -168,7 +198,7 @@ def week(
     _run_query(
         monday, today_date,
         tag, ref, status, include_zero, pretty, indent, fields,
-        strip_tags, strip_refs, config,
+        strip_tags, strip_refs, config, scan_from,
     )
 
 
@@ -195,6 +225,7 @@ def range_cmd(
     strip_tags: bool = _STRIP_TAGS_OPT,
     strip_refs: bool = _STRIP_REFS_OPT,
     config: Optional[Path] = _CONFIG_OPT,
+    scan_from: Optional[str] = _SCAN_FROM_OPT,
 ) -> None:
     """Show tasks worked on in a specific date range."""
     start = _parse_date_arg(from_date, "--from")
@@ -205,7 +236,7 @@ def range_cmd(
     _run_query(
         start, end,
         tag, ref, status, include_zero, pretty, indent, fields,
-        strip_tags, strip_refs, config,
+        strip_tags, strip_refs, config, scan_from,
     )
 
 
@@ -248,6 +279,11 @@ def configure() -> None:
         default=",".join(_get("paths", "extra_dirs", [])),
     )
     extra_dirs = [d.strip() for d in extra_dirs_raw.split(",") if d.strip()]
+    scan_from_cfg = typer.prompt(
+        "Oldest journal file date to scan (YYYY-MM-DD, leave empty to scan all files)",
+        default=_get("paths", "scan_from", "") or "",
+    )
+    scan_from_cfg = scan_from_cfg.strip() or None
 
     midnight_split = typer.prompt(
         "Midnight-crossing CLOCK strategy [split/start/end]",
@@ -300,11 +336,12 @@ def configure() -> None:
     def _toml_list(lst: list[str]) -> str:
         return "[" + ", ".join(_toml_str(x) for x in lst) + "]"
 
+    scan_from_line = f"scan_from = {_toml_str(scan_from_cfg)}\n" if scan_from_cfg else ""
     toml_content = f"""\
 [paths]
 journals = {_toml_str(journals)}
 extra_dirs = {_toml_list(extra_dirs)}
-
+{scan_from_line}
 [parsing]
 midnight_split = {_toml_str(midnight_split)}
 time_spent_property = {_toml_str(time_spent_property)}
